@@ -183,6 +183,10 @@ export default function TeacherSessionDetail({ params }: { params: Promise<{ id:
           )
         )
       },
+      onSessionEnded: () => {
+        // Sync UI if session was closed from another tab or device
+        setSession((prev) => prev ? { ...prev, isActive: false } : prev)
+      },
     }
   )
 

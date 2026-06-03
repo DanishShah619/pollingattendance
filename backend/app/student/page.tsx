@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { 
@@ -151,7 +151,7 @@ export default function StudentDashboard() {
     }
   }, [activeSession, history])
 
-  const fetchPolls = async (sessId: string) => {
+  const fetchPolls = useCallback(async (sessId: string) => {
     try {
       const res = await fetch(`/api/poll/session/${sessId}`)
       if (res.ok) {
@@ -161,28 +161,77 @@ export default function StudentDashboard() {
     } catch (err) {
       console.error('Failed to fetch polls:', err)
     }
-  }
+  }, [])
 
-  // Real-time SSE updates
+  // ── Poll for a new session when none is active ─────────────────────────────
+  // SSE is session-scoped, so we cannot receive a "session started" event
+  // via SSE when we are not yet subscribed to any session. Polling every 10s
+  // is the correct approach here — it is lightweight and stops the moment a
+  // session is detected, at which point SSE takes over for all live updates.
+  const activeSessionRef = useRef(activeSession)
+  useEffect(() => {
+    activeSessionRef.current = activeSession
+  }, [activeSession])
+
+  useEffect(() => {
+    // If we already have an active session, SSE handles everything — no need to poll.
+    if (activeSession) return
+
+    const pollForNewSession = async () => {
+      // Guard: abort if a session appeared while this async call was in-flight
+      if (activeSessionRef.current) return
+      try {
+        const res = await fetch('/api/session')
+        if (!res.ok) return
+        const data = await res.json()
+        const found: Session | null = data.sessions.find((s: Session) => s.isActive) || null
+        if (found) {
+          setActiveSession(found)
+          fetchPolls(found._id)
+          // Also refresh attendance history so check-in state is correct
+          const histRes = await fetch('/api/attendance/history')
+          if (histRes.ok) {
+            const histData = await histRes.json()
+            setHistory(histData.logs)
+          }
+        }
+      } catch (err) {
+        console.error('[Student] Session poll error:', err)
+      }
+    }
+
+    const intervalId = setInterval(pollForNewSession, 10_000)
+    return () => clearInterval(intervalId)
+  }, [activeSession, fetchPolls])
+
+  // ── Real-time SSE updates (active only when a session is live) ──────────────
   useSessionSSE(
     activeSession?._id,
     {
       onPollNew: (newPoll: any) => {
         setPolls((prev) => [newPoll, ...prev])
       },
-      onPollUpdate: (updated: any) => {
-        // Since vote counts are hidden from students, we just refetch
-        // or update status (which doesn't contain counts for students anyway)
-        if (activeSession) fetchPolls(activeSession._id)
+      onPollUpdate: (_updated: any) => {
+        // Vote counts are hidden from students while the poll is open,
+        // so we only need to signal that something changed — refetching
+        // would yield zeroed counts anyway. Nothing to do client-side.
       },
       onPollClosed: (closedData: any) => {
         setPolls((prev) =>
           prev.map((p) =>
             p._id === closedData.pollId
-              ? { ...p, isOpen: false, closedAt: closedData.closedAt }
+              ? { ...p, isOpen: false }
               : p
           )
         )
+      },
+      onSessionEnded: () => {
+        // Teacher ended the lecture — immediately clear session state so the
+        // student sees "No active sessions" without needing a page refresh.
+        setActiveSession(null)
+        setPolls([])
+        setIsCheckedIn(false)
+        setCheckInTime(null)
       },
     }
   )

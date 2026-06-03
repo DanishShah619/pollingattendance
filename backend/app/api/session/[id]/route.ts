@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { connectDB } from '@/lib/db'
 import Session from '@/model/Session'
 import { getAuthUser } from '@/lib/auth'
+import { broadcast } from '@/lib/sse'
 
 const patchSessionSchema = z.object({
   isActive: z.boolean().optional(),
@@ -86,6 +87,8 @@ export async function PATCH(
     }
 
     const updates = result.data
+    const wasActive = session.isActive
+
     if (updates.isActive === false && session.isActive === true) {
       // Closing the session: set endTime to now
       session.isActive = false
@@ -96,6 +99,15 @@ export async function PATCH(
     if (updates.subject) session.subject = updates.subject
 
     await session.save()
+
+    // Broadcast session:ended so all subscribed SSE clients (students) update
+    // immediately without needing a manual page refresh.
+    if (wasActive && !session.isActive) {
+      await broadcast(id, {
+        type: 'session:ended',
+        data: { sessionId: id, endTime: session.endTime },
+      })
+    }
 
     return NextResponse.json({ session })
   } catch (error: any) {
