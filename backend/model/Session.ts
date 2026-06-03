@@ -34,7 +34,10 @@ const SessionSchema = new Schema<ISession>({
   isActive:     { type: Boolean, default: true },
 }, { timestamps: true })
 
-// Index for fast "find active sessions for a semester"
+// Fast "active sessions for a semester/dept" — student dashboard
 SessionSchema.index({ department: 1, semester: 1, isActive: 1 })
+
+// Fast "sessions owned by this teacher" — teacher dashboard
+SessionSchema.index({ teacherId: 1, isActive: 1 })
 
 export default mongoose.models.Session || mongoose.model<ISession>('Session', SessionSchema)
