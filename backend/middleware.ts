@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 const secret = new TextEncoder().encode(process.env.JWT_SECRET)
 
 // These paths are always public — no JWT required
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout']
+const PUBLIC_PATHS = ['/login', '/register', '/api/auth/login', '/api/auth/logout', '/api/auth/register']
 
 // Page-level role enforcement
 const roleRoutes: Record<string, Array<'student' | 'teacher' | 'hod'>> = {
