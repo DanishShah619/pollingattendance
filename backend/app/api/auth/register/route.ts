@@ -77,6 +77,17 @@ export async function POST(req: NextRequest) {
     return response
   } catch (error: any) {
     console.error('[API Auth Register] Error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    if (error?.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || 'College ID'
+      const label = field === 'collegeId' ? 'College ID' : field
+      return NextResponse.json(
+        { error: `${label} is already taken. Please choose a different one.` },
+        { status: 409 }
+      )
+    }
+    return NextResponse.json(
+      { error: error?.message || 'Something went wrong during registration. Please try again.' },
+      { status: 500 }
+    )
   }
 }

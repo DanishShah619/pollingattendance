@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Lock, User, AlertCircle, Loader2 } from 'lucide-react'
+import { Lock, User, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const [collegeId, setCollegeId] = useState('')
@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -59,7 +60,19 @@ export default function LoginPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'Login failed')
+        // Map API errors to friendly user-facing messages
+        const msg = data.error || ''
+        if (res.status === 401 || msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('password') || msg.toLowerCase().includes('credentials')) {
+          throw new Error('Incorrect College ID or password. Please try again.')
+        } else if (res.status === 404 || msg.toLowerCase().includes('not found')) {
+          throw new Error('No account found with that College ID.')
+        } else if (res.status === 429) {
+          throw new Error('Too many login attempts. Please wait a minute and try again.')
+        } else if (res.status >= 500) {
+          throw new Error('Something went wrong on our end. Please try again shortly.')
+        } else {
+          throw new Error(msg || 'Login failed. Please check your details and try again.')
+        }
       }
 
       redirectByRole(data.user.role)
@@ -141,13 +154,21 @@ export default function LoginPage() {
                 <input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-4 text-white placeholder-gray-500 transition-all duration-200 focus:border-purple-500/60 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
+                  className="block w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-10 text-white placeholder-gray-500 transition-all duration-200 focus:border-purple-500/60 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-300 transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, User, AlertCircle, Loader2, GraduationCap, BookOpen, Shield } from 'lucide-react'
+import { Lock, User, AlertCircle, Loader2, GraduationCap, BookOpen, Shield, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 
 type Role = 'student' | 'teacher' | 'hod'
@@ -54,7 +54,9 @@ export default function RegisterPage() {
   const [semester, setSemester]       = useState(1)
 
   const [error, setError]   = useState('')
+  const [collegeIdError, setCollegeIdError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const redirectByRole = (role: Role) => {
     if (role === 'student')  router.push('/student')
@@ -65,6 +67,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setCollegeIdError('')
     setLoading(true)
 
     try {
@@ -82,7 +85,24 @@ export default function RegisterPage() {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Registration failed')
+
+      if (!res.ok) {
+        const msg = data.error || ''
+        // College ID conflict — show inline under the field
+        if (res.status === 409 || msg.toLowerCase().includes('taken') || msg.toLowerCase().includes('already')) {
+          setCollegeIdError(`"${collegeId}" is already taken. Please choose a different College ID.`)
+          setLoading(false)
+          return
+        } else if (res.status === 400 && msg.toLowerCase().includes('semester')) {
+          throw new Error('Please select your semester before continuing.')
+        } else if (res.status === 429) {
+          throw new Error('Too many registration attempts. Please wait a minute and try again.')
+        } else if (res.status >= 500) {
+          throw new Error('Something went wrong on our end. Please try again shortly.')
+        } else {
+          throw new Error(msg || 'Registration failed. Please check your details and try again.')
+        }
+      }
 
       redirectByRole(selectedRole)
     } catch (err: any) {
@@ -217,7 +237,6 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* College ID */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                   College ID
@@ -228,10 +247,21 @@ export default function RegisterPage() {
                   required
                   placeholder={selectedRole === 'student' ? 'e.g. STU2024001' : selectedRole === 'hod' ? 'e.g. HOD001' : 'e.g. TCH001'}
                   value={collegeId}
-                  onChange={(e) => setCollegeId(e.target.value.toUpperCase())}
-                  className="block w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 px-4 text-white placeholder-gray-500 transition-all focus:border-purple-500/60 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm font-mono"
+                  onChange={(e) => { setCollegeId(e.target.value.toUpperCase()); setCollegeIdError('') }}
+                  className={`block w-full rounded-xl border bg-white/[0.04] py-3 px-4 text-white placeholder-gray-500 transition-all focus:bg-white/[0.06] focus:outline-none focus:ring-2 text-sm font-mono ${
+                    collegeIdError
+                      ? 'border-red-500/60 focus:border-red-500/60 focus:ring-red-500/20'
+                      : 'border-white/10 focus:border-purple-500/60 focus:ring-purple-500/20'
+                  }`}
                 />
-                <p className="text-xs text-gray-600">Must be unique. Used to log in.</p>
+                {collegeIdError ? (
+                  <p className="flex items-center gap-1.5 text-xs text-red-400 font-medium">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    {collegeIdError}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-600">Must be unique. Used to log in.</p>
+                )}
               </div>
 
               {/* Password */}
@@ -243,14 +273,22 @@ export default function RegisterPage() {
                   </div>
                   <input
                     id="reg-password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     minLength={6}
                     placeholder="Min. 6 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-9 pr-4 text-white placeholder-gray-500 transition-all focus:border-purple-500/60 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
+                    className="block w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-9 pr-10 text-white placeholder-gray-500 transition-all focus:border-purple-500/60 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-300 transition-colors"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
