@@ -35,9 +35,17 @@ export async function POST(req: NextRequest) {
     const { sessionId, lat, lng, accuracy } = result.data
 
     // ── 1. Geolocation Accuracy Guard ─────────────────────────────────────────
-    if (accuracy > 50) {
+    const maxAllowedAccuracy = process.env.MAX_GPS_ACCURACY
+      ? parseFloat(process.env.MAX_GPS_ACCURACY)
+      : process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+      ? 1000
+      : 300 // 300m accommodates laptop Wi-Fi geolocation while remaining practical
+
+    if (accuracy > maxAllowedAccuracy) {
       return NextResponse.json(
-        { error: 'GPS accuracy is poor (> 50m). Please move to an open area and retry.' },
+        {
+          error: `Location accuracy is too low (±${Math.round(accuracy)}m > limit ±${maxAllowedAccuracy}m). Please enable Wi-Fi or move near a window and retry.`,
+        },
         { status: 400 }
       )
     }

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "keep-alive": "npx --yes tsx scripts/keepAlive.ts",
+    "keep-alive:once": "npx --yes tsx scripts/keepAlive.ts --one-shot"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",
